@@ -1,7 +1,7 @@
 
 
 namespace WebApp;
-public class UtilsTest(Xlog output)
+public class UtilsTest(Xlog Console)
 {
     
     [Fact]
@@ -11,7 +11,23 @@ public class UtilsTest(Xlog output)
         Assert.Equal(12, Utils.SumInts(7, 5));
         Assert.Equal(-3, Utils.SumInts(6, -9));
     }
-/*
+
+
+    [Fact]
+    public void TestRemoveMockUsers()
+  {
+      var read = File.ReadAllText(Path.Combine("json", "mock-users.json"));
+      Arr mockUsers = JSON.Parse(read);
+      Arr usersInDb = SQLQuery("Select * FROM users");
+      Arr emailsInDb = usersInDb.Map(user => user.email);
+      Arr mockUserInDb = mockUsers.Filter(
+          mockUser => emailsInDb.Contains(mockUser.email));
+
+      var result = Utils.DeleteMockUsers();
+
+      Assert.Equal(mockUserInDb.Length, result.Length);
+  } 
+
     [Fact]
     public void TestCreateMockUsers()
     {
@@ -37,22 +53,74 @@ public class UtilsTest(Xlog output)
         Console.WriteLine("The test passed!");
     }
     
-    */
+    
 
-    [Fact]
-    public void Testp()
+  [Fact]
+    public void TestCountDomainsFromUserEmails()
+{
+    var expectedDomainCounts = Utils.CountDomainsFromUserEmails();
+    var actualDomainCounts = new Obj();
+
+    var query = SQLQuery(@"SELECT SUBSTR(email, INSTR(email, '@') + 1) AS domain,
+        COUNT(*) AS count FROM users GROUP BY domain ORDER BY count DESC;");
+
+    foreach (var email in query)
     {
-        Arr passInDb = SQLQuery("SELECT PASSWORD FROM users WHERE id=6");
-        string password = passInDb[0]["password"].ToString();
-        output.WriteLine("Your password is: "+password);
-        bool isPasswordGoodEnough = Utils.IsPasswordGoodEnough(password); 
+        actualDomainCounts[$"{email.domain}"] = email.count;
+    }
 
-        Assert.True(isPasswordGoodEnough, "The password is not considered good enough.");
+    foreach (var domain in expectedDomainCounts.GetKeys())
+    {
+        string expected = $"{domain} {expectedDomainCounts[domain]}";
+        string actual = $"{domain} {actualDomainCounts[domain]}";
+        Assert.Equal(expected, actual);
 
-        if (isPasswordGoodEnough==false) {
-            output.WriteLine("Not Good Enough");
-        }
+    }
+}
 
+    [Theory]
+    [InlineData(
+        "---",
+        "Hello, I am going through hell. Hell is a real fucking place " +
+            "outside your goddamn comfy tortoiseshell!",
+        "Hello, I am going through ---. --- is a real --- place " +
+            "outside your --- comfy tortoiseshell!"
+    )]
+    [InlineData(
+        "---",
+        "Rhinos have a horny knob? (or what should I call it) on " +
+            "their heads. And doorknobs are damn round.",
+        "Rhinos have a --- ---? (or what should I call it) on " +
+            "their heads. And doorknobs are --- round."
+    )]
+    public void TestRemoveBadWords(string replaceWith, string original, string expected)
+    {
+        Assert.Equal(expected, Utils.RemoveBadWords(original, replaceWith));
+    }
+
+
+ [Theory]
+    [InlineData("abC9#fgh", true)]  // ok
+    [InlineData("stU5/xyz", true)]  // ok too
+    [InlineData("abC9#fg", false)]  // too short
+    [InlineData("abCd#fgh", false)] // no digit
+    [InlineData("abc9#fgh", false)] // no capital letter
+    [InlineData("abC9efgh", false)] // no special character
+    public void TestIsPasswordGoodEnough(string password, bool expected)
+    {
+        Assert.Equal(expected, Utils.IsPasswordGoodEnough(password));
+    }
+
+    [Theory]
+    [InlineData("abC9#fgh", true)]  // ok
+    [InlineData("stU5/xyz", true)]  // ok too
+    [InlineData("abC9#fg", false)]  // too short
+    [InlineData("abCd#fgh", false)] // no digit
+    [InlineData("abc9#fgh", false)] // no capital letter
+    [InlineData("abC9efgh", false)] // no special character
+    public void TestIsPasswordGoodEnoughRegexVersion(string password, bool expected)
+    {
+        Assert.Equal(expected, Utils.IsPasswordGoodEnoughRegexVersion(password));
     }
 
 }
